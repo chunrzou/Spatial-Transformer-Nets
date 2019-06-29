@@ -902,9 +902,8 @@ def U_matrix(input_points,control_points):
     pairwise_diff_square = tf.square(pairwise_diff)
     pairwise_dist = tf.reduce_sum(pairwise_diff_square,axis=-1)
     U_matrix = 0.5*pairwise_dist*tf.log(pairwise_dist)
-    U_matrix = tf.where(tf.is_nan(U_matrix,tf.zeros_like(U_matrix), \
+    U_matrix = tf.where(tf.is_nan(U_matrix),tf.zeros_like(U_matrix), \
                 U_matrix)
-
     return U_matrix
 
 def TPSGridGen(target_height,target_width,target_control_points,source_control_points):
@@ -916,7 +915,7 @@ def TPSGridGen(target_height,target_width,target_control_points,source_control_p
     ----------------------
         target_height   -- Moving grid height
         target_width    -- Moving grid width
-        target_control_points  -- Temp moving grid control points
+        target_control_points  -- Temp moving grid control points with shape (N,2)
 
 
     Outputs
@@ -932,6 +931,76 @@ def TPSGridGen(target_height,target_width,target_control_points,source_control_p
     N = tf.shape(target_control_points)[0]
     target_control_points = tf.cast(target_control_points,dtype=tf.float32)
     U_target_control = U_matrix(target_control_points,target_control_points)
+    
+    ones_vec = tf.ones([N,1],tf.float32)
+    P = tf.concat([ones_vec,target_control_points],axis=-1)
+    L = tf.concat([U_target_control,P],axis=1)
+
+class TPSGridGen_Layer(tf.keras.layers.Layer):
+
+	def __init__(self,target_height,target_width,target_control_points,**kwargs):
+		'''
+		target_control_points should have the extent from -1 to 1
+		'''
+		super(TPSGRidGen_Layer,self).__init__(**kwargs)
+		assert tf.rank(target_control_points) == 3
+		assert tf.shape(target_control_points)[1] == 2
+
+		N = tf.shape(target_control_points)[0]
+		self.num_points = N
+		target_control_points = tf.cast(target_control_points,tf.float32)
+		U_target_control = U_matrix(target_control_points,target_control_points)
+		ones_vec = tf.ones([N,1],tf.float32)
+		P = tf.concat([ones_vec,target_control_points])
+		L_upperRows = tf.concat([U_target_control,P],axis=1)
+		L_lowerRows = tf.concat([tf.transpose(P),tf.zeros([3,3])],axis=1)
+		L = tf.concat([L_upperRows,L_lowerRows],axis=0)
+
+		self.L_inverse = tf.linalg.inv(L)
+
+		# create target coordinate matrix
+		HW = target_height*target_width
+		self.HW = HW
+
+		
+		y = tf.range(limit=target_height,dtype=tf.int32)
+		x = tf.range(limit=target_width,dtype=tf.int32)
+		X,Y = tf.meshgrid(x,y)
+		# Scale x,y to (-1,1)
+		Y = Y * 2.0 / (target_height - 1) - 1.0
+		X = X * 2.0 / (target_width - 1) - 1.0
+
+		target_coordinate = tf.concat([X,Y],axis=1)
+		U_target_coordinate2Control = U_matrix(target_coordinate,target_control_points)
+		self.P_target_coordinate2Control = tf.concatenate([U_target_coordinate2Control,
+						tf.ones([HW,1],dtype=tf.float32),target_coordinate],axis=1)
+
+
+	##def build(self,input_shape) # This layer holds no internal weights for the DL neurons
+
+	def call(self,inputs):
+		assert tf.rank(inputs) == 3
+		## The source_control_points is the output parameter form previous connected layer
+		source_control_points = inputs
+		batch_size = tf.shape(source_control_points)[0]
+		V = tf.concat([source_control_points,tf.zeros([batch_size,3,2],dtype=tf.float32)],axis=1)
+		## Memo: L_inverse is of (N+3,N+3)
+		L_inverse_batch = tf.tile(tf.expand_dims(self.L_inverse,axis=0),[batch_size,1,1])
+		mapping_matrix = tf.matmul(L_inverse_batch,V)
+		P_target_coordinate2Control_batch = tf.tile(tf.expand_dims(self.P_target_coordinate2Control,axis=0),[batch_size,1,1])
+		source_coordinates = tf.matmul(self.P_target_coordinate2Control,mapping_matrix)
+
+
+	def compute_output_shape(self,input_shape):
+		return (input_shape[0],self.HW,2)
+
+
+
+
+
+
+
+
     
 
 

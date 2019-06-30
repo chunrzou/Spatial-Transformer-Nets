@@ -3,8 +3,7 @@ import copy
 import math
 import random
 import threading
-import time
-import PIL
+import time 
 import scipy
 import scipy.ndimage as ndi
 from scipy import linalg
@@ -814,13 +813,13 @@ def transformer_V2(U, theta, out_size, name='SpatialTransformer', **kwargs):
         return output
 
 
-class keras_tranformer_layer_V2(tf.keras.layers.Layer):
+class keras_transformer_layer_V2(tf.keras.layers.Layer):
     def __init__(self,output_dims=None,**kwargs):
         self.output_dims = output_dims
-        super(keras_tranformer_layer_V2,self).__init__(**kwargs)
+        super(keras_transformer_layer_V2,self).__init__(**kwargs)
 
     def build(self,input_shape):
-        super(keras_tranformer_layer_V2,self).build(input_shape)
+        super(keras_transformer_layer_V2,self).build(input_shape)
 
     def call(self,inputs):
         input_fmap, theta = inputs

@@ -270,7 +270,7 @@ class tps_classifier(tf.keras.Model):
 		
 class tps_localizer(tf.keras.Model):
 
-	def __init__(self,grid_height,grid_width,target_control_points,input_shape,bounded=True,**kwargs)
+	def __init__(self,grid_height,grid_width,target_control_points,input_shape,bounded=True,**kwargs):
 		'''
 		tps_localizer will generate the source_control_point in the input images.
 
